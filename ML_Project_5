@@ -1,0 +1,599 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "collapsed_sections": [],
+      "authorship_tag": "ABX9TyNL7dlrYUyS7xFfUvJ4ywLk"
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Part 1: Implement a Perceptron"
+      ],
+      "metadata": {
+        "id": "W_-t0W1rQOSh"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "pip install -q keras-tuner scikeras"
+      ],
+      "metadata": {
+        "id": "9vIjQaCf9Qt7",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "925ef8a9-4eb3-4518-f443-8344d0dd5bed"
+      },
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\u001b[K     |████████████████████████████████| 135 kB 15.3 MB/s \n",
+            "\u001b[K     |████████████████████████████████| 1.6 MB 74.6 MB/s \n",
+            "\u001b[?25h"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 2,
+      "metadata": {
+        "id": "6aSZzQ5CPe83"
+      },
+      "outputs": [],
+      "source": [
+        "import matplotlib as mpl\n",
+        "import matplotlib.pyplot as plt\n",
+        "import pandas as pd\n",
+        "import tensorflow as tf\n",
+        "\n",
+        "from sklearn import datasets\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.neural_network import MLPRegressor\n",
+        "from sklearn.metrics import r2_score\n",
+        "from sklearn.metrics import mean_squared_error\n",
+        "from seaborn import load_dataset\n",
+        "from tensorflow import keras\n",
+        "from tensorflow.keras import layers\n",
+        "from sklearn.preprocessing import StandardScaler\n",
+        "from scikeras.wrappers import KerasClassifier\n",
+        "from scikeras.wrappers import KerasRegressor\n",
+        "from tensorflow.keras.models import Sequential\n",
+        "from tensorflow.keras.layers import Dense\n",
+        "from tensorflow.keras.layers import Input\n",
+        "from sklearn.model_selection import GridSearchCV"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Data loading and preparation\n",
+        "diabetes = datasets.load_diabetes()"
+      ],
+      "metadata": {
+        "id": "FsqjOHE2PsHL"
+      },
+      "execution_count": 3,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "data = pd.DataFrame(diabetes.data)\n",
+        "features = diabetes.feature_names\n",
+        "data.columns = features\n",
+        "\n",
+        "target = diabetes.target"
+      ],
+      "metadata": {
+        "id": "gxBxAMkvPvv8"
+      },
+      "execution_count": 4,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "X_train, X_test, y_train, y_test =  train_test_split(data, target, test_size=0.2, random_state=42)"
+      ],
+      "metadata": {
+        "id": "wpBGhHljPv8z"
+      },
+      "execution_count": 5,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def print_stats(model, data, targets):\n",
+        "  predictions = model.predict(data)\n",
+        "  \n",
+        "  r2 = r2_score(targets, predictions)\n",
+        "  RMSE = mean_squared_error(targets, predictions, squared=False)\n",
+        "\n",
+        "  print(\"r2 Coefficient:\", r2)\n",
+        "  print(\"RMSE:\", RMSE)"
+      ],
+      "metadata": {
+        "id": "rFkJLY2YQnW0"
+      },
+      "execution_count": 6,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Implement a multilayer perceptron\n",
+        "perceptron = MLPRegressor(max_iter=10000).fit(X_train, y_train)\n",
+        "\n",
+        "# Seems to take quite a while to converge"
+      ],
+      "metadata": {
+        "id": "LqHDynl8RSNI"
+      },
+      "execution_count": 20,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print_stats(perceptron, X_train, y_train)"
+      ],
+      "metadata": {
+        "id": "1fNovRGJRUU0",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "9540ab7f-da5e-4d58-9d39-0abbef579768"
+      },
+      "execution_count": 21,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "r2 Coefficient: 0.525182038019476\n",
+            "RMSE: 53.71389876659355\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Part 2: Implement a Keras Classifier"
+      ],
+      "metadata": {
+        "id": "pkYk0cfbRlGn"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Data preparation, for simplicity it's all in one cell\n",
+        "# I'm also repeating variable names\n",
+        "\n",
+        "# Load dataset\n",
+        "data = load_dataset(\"titanic\")\n",
+        "\n",
+        "# Remove column; too many missing values\n",
+        "data.drop(\"deck\", axis=1)\n",
+        "\n",
+        "# Impute age using the passenger class\n",
+        "age_dict = {}\n",
+        "\n",
+        "# Define the median age per class\n",
+        "for x in data['pclass'].unique():\n",
+        "    column = data.loc[data['pclass']==x]\n",
+        "    median = column['age'].median()\n",
+        "    age_dict[x] = median\n",
+        "\n",
+        "# Replace the age with the median age of that class\n",
+        "def impute_age(pclass):\n",
+        "  if type(pclass) == int:\n",
+        "    return(age_dict[pclass])\n",
+        "\n",
+        "  elif type(pclass) == pd.Series:\n",
+        "    for x in pclass:\n",
+        "      x = age_dict[x]\n",
+        "      return x\n",
+        "\n",
+        "data['age'] = impute_age(data['pclass'])\n",
+        "\n",
+        "# Remove remaining null values\n",
+        "data.dropna()\n",
+        "\n",
+        "# Convert categorical variables into dummy variables\n",
+        "data = pd.get_dummies(data=data, columns=[\"sex\", \"embarked\", \"class\", \"who\", \"adult_male\", \"deck\", \"embark_town\", \"alive\", \"alone\"])\n",
+        "\n",
+        "X = data\n",
+        "y = X.pop('survived')\n",
+        "\n",
+        "X_train, X_test, y_train, y_test =  train_test_split(X, y, test_size=0.2, random_state=42)"
+      ],
+      "metadata": {
+        "id": "3Wn9S0PHRnU5"
+      },
+      "execution_count": 33,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Apparently I have to define a function for the KerasClassifier\n",
+        "# I couldn't find much info about it or a different way of doing this\n",
+        "# I also couldn't find a way without using meta\n",
+        "def build_classifier(meta):\n",
+        "  print(meta[\"target_type_\"])\n",
+        "\n",
+        "  # Simple model\n",
+        "  model = Sequential()\n",
+        "  model.add(Input(meta[\"n_features_in_\"]))\n",
+        "  model.add(Dense(meta[\"n_classes_\"]))\n",
+        "\n",
+        "  return model"
+      ],
+      "metadata": {
+        "id": "-p8OnFLjJkVn"
+      },
+      "execution_count": 34,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "classifier = KerasClassifier(model=build_classifier, loss=\"binary_crossentropy\")"
+      ],
+      "metadata": {
+        "id": "5gegy3gqMLUG"
+      },
+      "execution_count": 35,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "classifier.fit(X_train, y_train)"
+      ],
+      "metadata": {
+        "id": "fTQa3G9aKOB2",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "720bf7fa-f572-4fc3-c656-2b76a5a49024"
+      },
+      "execution_count": 36,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "binary\n",
+            "23/23 [==============================] - 0s 2ms/step - loss: 5.7745\n"
+          ]
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "KerasClassifier(\n",
+              "\tmodel=<function build_classifier at 0x7f9761e0c680>\n",
+              "\tbuild_fn=None\n",
+              "\twarm_start=False\n",
+              "\trandom_state=None\n",
+              "\toptimizer=rmsprop\n",
+              "\tloss=binary_crossentropy\n",
+              "\tmetrics=None\n",
+              "\tbatch_size=None\n",
+              "\tvalidation_batch_size=None\n",
+              "\tverbose=1\n",
+              "\tcallbacks=None\n",
+              "\tvalidation_split=0.0\n",
+              "\tshuffle=True\n",
+              "\trun_eagerly=False\n",
+              "\tepochs=1\n",
+              "\tclass_weight=None\n",
+              ")"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 36
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "y_pred = classifier.predict(X_test)\n",
+        "\n",
+        "score = classifier.scorer(y_test, y_pred)\n",
+        "print(score)"
+      ],
+      "metadata": {
+        "id": "-Ply3dlRM-eR",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "e5c91c8e-86e8-4686-ed11-9dd92eb46d62"
+      },
+      "execution_count": 37,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "6/6 [==============================] - 0s 3ms/step\n",
+            "0.5865921787709497\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Part 3: Implement a Keras Regressor"
+      ],
+      "metadata": {
+        "id": "JVYz9LPMRopW"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Data preparation\n",
+        "# Rewriting 'data' again\n",
+        "data = pd.read_csv(\"bike_share_hour.csv\")\n",
+        "\n",
+        "data = data.drop(columns=[\"dteday\"])\n",
+        "data.dropna()\n",
+        "\n",
+        "scalar = StandardScaler()\n",
+        "scalar.fit(data)\n",
+        "scalar.transform(data)\n",
+        "\n",
+        "data = data.drop(columns=[\"instant\", \"casual\", \"registered\"])\n",
+        "\n",
+        "X = data\n",
+        "y = X.pop(\"cnt\")\n",
+        "\n",
+        "X_train, X_test, y_train, y_test =  train_test_split(X, y, test_size=1/3, random_state=42)"
+      ],
+      "metadata": {
+        "id": "9uAP2QeERsj3"
+      },
+      "execution_count": 38,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Define regressor\n",
+        "def build_regressor(meta):\n",
+        "  # Similar to the classifier model\n",
+        "  model = keras.models.Sequential()\n",
+        "  model.add(Input(meta[\"n_features_in_\"]))\n",
+        "  model.add(Dense(100, activation=\"relu\"))\n",
+        "  model.add(Dense(1))\n",
+        "\n",
+        "  # Using mean_squared_error did not work for the classifier\n",
+        "  model.compile(loss='mean_squared_error', metrics=['mae'], optimizer='adam')\n",
+        "  return model"
+      ],
+      "metadata": {
+        "id": "uvKKgpMfcGZ0"
+      },
+      "execution_count": 56,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Keras sequential regressor\n",
+        "regressor = KerasRegressor(model=build_regressor)"
+      ],
+      "metadata": {
+        "id": "4nKc8UcooYQU"
+      },
+      "execution_count": 60,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "regressor.fit(X_train, y_train)"
+      ],
+      "metadata": {
+        "id": "z1m_HtCHpf_S",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "255a68b7-afcd-44f2-acd9-4b39644d66b6"
+      },
+      "execution_count": 61,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "363/363 [==============================] - 1s 2ms/step - loss: 32207.4609 - mae: 129.3750\n"
+          ]
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "KerasRegressor(\n",
+              "\tmodel=<function build_regressor at 0x7f96dbb91050>\n",
+              "\tbuild_fn=None\n",
+              "\twarm_start=False\n",
+              "\trandom_state=None\n",
+              "\toptimizer=rmsprop\n",
+              "\tloss=None\n",
+              "\tmetrics=None\n",
+              "\tbatch_size=None\n",
+              "\tvalidation_batch_size=None\n",
+              "\tverbose=1\n",
+              "\tcallbacks=None\n",
+              "\tvalidation_split=0.0\n",
+              "\tshuffle=True\n",
+              "\trun_eagerly=False\n",
+              "\tepochs=1\n",
+              ")"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 61
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "y_pred = regressor.predict(X_test)\n",
+        "\n",
+        "score = regressor.scorer(y_test, y_pred)\n",
+        "print(score)\n",
+        "\n",
+        "# Doesn't score very well, not sure how to structure the regressor appropriately"
+      ],
+      "metadata": {
+        "id": "09pzwoHacjTk",
+        "outputId": "6e399a7d-8fb2-416d-cb90-6898bd90f37f",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 62,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "182/182 [==============================] - 0s 1ms/step\n",
+            "0.2614183278184433\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Part 4: Tune Your Keras Regressor"
+      ],
+      "metadata": {
+        "id": "b9VWYZhyRvDy"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(regressor.get_params().keys())"
+      ],
+      "metadata": {
+        "id": "eC4USBIR-1UC",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "101526c1-1149-4c03-bc7b-1297f17d65b4"
+      },
+      "execution_count": 63,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "dict_keys(['model', 'build_fn', 'warm_start', 'random_state', 'optimizer', 'loss', 'metrics', 'batch_size', 'validation_batch_size', 'verbose', 'callbacks', 'validation_split', 'shuffle', 'run_eagerly', 'epochs'])\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Use grid search\n",
+        "batch_size = [5, 10, 20]\n",
+        "epochs = [10, 50, 100]\n",
+        "\n",
+        "param_grid = dict(batch_size=batch_size, epochs=epochs)\n",
+        "\n",
+        "grid_search = GridSearchCV(regressor, param_grid, cv=5).fit(X_train, y_train)"
+      ],
+      "metadata": {
+        "id": "Duj_I8KWrPpD"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "grid_search.best_params_"
+      ],
+      "metadata": {
+        "id": "5zumgOTb9D_a",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "f8008996-0347-4a62-eeb9-3e90f3dbebe8"
+      },
+      "execution_count": 65,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "{'batch_size': 5, 'epochs': 100}"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 65
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Evaluate final regressor\n",
+        "final_model = grid_search.best_estimator_\n",
+        "\n",
+        "y_pred = final_model.predict(X_test)\n",
+        "score = final_model.scorer(y_test, y_pred)\n",
+        "print(score)"
+      ],
+      "metadata": {
+        "id": "kue3AXKnPrNX",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "f90f87d2-7ca8-4ba5-ad4f-e8786644ecba"
+      },
+      "execution_count": 66,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "1159/1159 [==============================] - 3s 2ms/step\n",
+            "0.9051847439698169\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
